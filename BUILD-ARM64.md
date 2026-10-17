@@ -167,3 +167,36 @@ APPLE_API_KEY_P8_BASE64
 APPLE_API_ISSUER
 APPLE_TEAM_ID
 ```
+
+## 分发：为什么不在 Mac App Store
+
+Slate 依赖辅助功能 API（`AXUIElement`）移动/缩放/聚焦**其他应用**的窗口。Mac App Store
+强制 App Sandbox，而沙盒中没有任何 entitlement 允许操作其他进程的窗口，因此这类工具
+（Magnet、Rectangle、BetterSnapTool…）都只能在 App Store 之外分发。另外 GPLv3 与
+App Store 的 DRM/条款冲突（VLC 曾因此下架）。
+
+正式包的标准路径是 **Developer ID 签名 + 公证 + staple**：
+
+```bash
+git tag v1.0.25 && git push origin v1.0.25
+```
+
+CI 会：构建 universal → Developer ID 签名（hardened runtime）→ notarytool 公证 →
+staple → `spctl` 校验 → 创建 Draft Release 并上传 `Slate-<version>-universal.zip`
+和 `.sha256`。arm64 单独构建保留为 Actions artifact，不进 Release（它是 ad-hoc 签名）。
+
+仓库 secrets（与 coeditor 同名）：
+
+```
+APPLE_CERTIFICATE            # Certificates.p12 的 base64
+APPLE_CERTIFICATE_PASSWORD   # p12 密码
+KEYCHAIN_PASSWORD            # CI 临时 keychain 密码（随机）
+APPLE_SIGNING_IDENTITY       # "Developer ID Application: ji li (98C4AQNKS9)"
+APPLE_API_KEY                # App Store Connect Key ID
+APPLE_API_KEY_P8_BASE64      # AuthKey_<KeyID>.p8 的 base64
+APPLE_API_ISSUER             # App Store Connect Issuer ID (UUID)
+APPLE_TEAM_ID
+```
+
+用户首次启动后，需要在「系统设置 → 隐私与安全性 → 辅助功能」中勾选 Slate，否则
+窗口操作不会生效（每次替换二进制后签名身份变化时可能需要重新授权）。

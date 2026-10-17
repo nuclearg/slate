@@ -207,8 +207,10 @@ jobs:
           retention-days: 14
 
       # Draft Release 已由 draft job 建好，这里只上传（--clobber 允许重跑覆盖）
+      # 只把签名+公证的 universal 包传进 Release；arm64 单独构建是 ad-hoc，
+      # 直接给下载者会造成"无法验证开发者"，它保留为 Actions artifact。
       - name: Upload to draft release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.arch == 'universal' 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
