@@ -200,3 +200,17 @@ APPLE_TEAM_ID
 
 用户首次启动后，需要在「系统设置 → 隐私与安全性 → 辅助功能」中勾选 Slate，否则
 窗口操作不会生效（每次替换二进制后签名身份变化时可能需要重新授权）。
+
+## Homebrew Cask
+
+仓库里带了 `Casks/slate-amd64.rb`（token 按 arm64 迁移命名；包本身是 universal，
+Intel 机器也能装）：
+
+```bash
+brew tap nuclearg/slate https://github.com/nuclearg/slate
+brew install --cask slate-amd64
+```
+
+升级时改 `Casks/slate-amd64.rb` 里的 `version` 与 `sha256`（取自 Release 的
+`.sha256` 文件）即可。若以后单独建 `nuclearg/homebrew-slate` 仓库，就可以省掉
+显式 URL，直接 `brew tap nuclearg/slate`。
