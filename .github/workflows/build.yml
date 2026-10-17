@@ -1,0 +1,215 @@
+name: Build (macOS arm64 / universal)
+
+# Slate 的 arm64 迁移构建。项目没有 Rust/Tauri，直接调用 script/build.sh，
+# 由它用当前 Xcode SDK 重新编译全部 .m 并复用原版 nib。
+#
+# - push master / PR / 手工触发：构建 arm64 与 universal，上传 Actions artifact
+# - push tag v*：先建（或复用）Draft Release，构建后把 zip 传上去（人工确认再发布）
+# - 配了 Apple secrets 时，对 universal 包做 Developer ID 签名 + 公证 + staple；
+#   没配就保持 ad-hoc（产物可用，但用户首次打开要在「隐私与安全性」放行）
+#
+# 签名 secrets 与 nuclearg/coeditor 保持同名，直接复制即可：
+#   APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD / KEYCHAIN_PASSWORD /
+#   APPLE_SIGNING_IDENTITY / APPLE_API_KEY / APPLE_API_KEY_P8_BASE64 /
+#   APPLE_API_ISSUER / APPLE_TEAM_ID
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+# 默认只读；需要写 Release 的 job 自己提权
+permissions:
+  contents: read
+
+concurrency:
+  # tag 触发的发布构建不允许被后续 push 取消
+  group: slate-build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  # 先建 Draft Release，再让两个矩阵 job 上传。
+  # 不这么做的话，arm64 与 universal 会各自 create 一个同 tag 的 draft，
+  # 资产被拆到两个 draft 里（coeditor 里踩过这个坑）。
+  draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # 本 job 不 checkout，所以 gh 必须显式 -R，否则会报 not a git repository
+      - name: Create or reuse the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "已存在 release，直接复用：$RELEASE_TAG"
+          else
+            gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+              --title "Slate $RELEASE_TAG (Apple Silicon)" \
+              --notes 'Slate 的 arm64 迁移构建。脚本引擎行为与原版 Intel 构建逐项对齐（见 BUILD-ARM64.md）。' \
+              --draft
+          fi
+          gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft --jq '"目标: tag=\(.tagName) draft=\(.isDraft)"'
+
+  build:
+    needs: draft
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # arm64 是主产物；universal 用于分发（同时覆盖 Intel）
+        arch: [arm64, universal]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Slate/Slate-Info.plist)"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "版本: $VERSION"
+
+      # ---------- Apple 签名证书（未配 secrets 时自动降级为 ad-hoc） ----------
+      - name: Import Apple signing certificate
+        if: matrix.arch == 'universal'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_CERTIFICATE:-}" ]]; then
+            echo "::warning::未配置 APPLE_CERTIFICATE——本次为 ad-hoc 签名，用户首次打开需手动放行"
+            exit 0
+          fi
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security list-keychains -d user -s build.keychain
+          security import "$RUNNER_TEMP/certificate.p12" -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain >/dev/null
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security find-identity -v -p codesigning build.keychain
+          IDENTITY="${APPLE_SIGNING_IDENTITY_SECRET:-}"
+          if [[ -z "$IDENTITY" ]]; then
+            IDENTITY="$(security find-identity -v -p codesigning build.keychain | awk -F'"' '/Developer ID Application/ {print $2; exit}')"
+          fi
+          if [[ -z "$IDENTITY" ]]; then
+            echo "::error::keychain 里没有 Developer ID Application 证书（.p12 是否只含证书、没含私钥？）"
+            exit 1
+          fi
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "已导入签名身份：$IDENTITY"
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          args=(--arch "${{ matrix.arch }}")
+          if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+            args+=(--sign "$SIGN_IDENTITY")
+          fi
+          SLATE_VERSION="$VERSION" ./script/build.sh "${args[@]}"
+
+      # 用原版 Intel 二进制（Rosetta）当参考，逐项对比脚本引擎输出。
+      # --allow-skip：如果 runner 根本没有 GUI session（两边都跑不出东西）就跳过并告警；
+      # 真出现差异、或只有一边没输出，仍然失败。
+      - name: Verify script-engine parity
+        if: matrix.arch == 'arm64'
+        run: |
+          set -euo pipefail
+          if [[ "$(uname -m)" != "arm64" ]]; then
+            echo "::warning::当前 runner 不是 arm64，无法运行 arm64 产物，跳过 parity"
+            exit 0
+          fi
+          sudo softwareupdate --install-rosetta --agree-to-license || true
+          if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+            echo "::warning::Rosetta 不可用，跳过与原版 Intel 二进制的对比"
+            exit 0
+          fi
+          ./script/verify-parity.sh \
+            build/Release/Slate.app \
+            "build/release-${{ matrix.arch }}/Slate.app" \
+            --allow-skip
+
+      # ---------- 公证（仅 universal，且仅在配置了凭据时） ----------
+      - name: Notarize and staple
+        if: matrix.arch == 'universal'
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGN_IDENTITY:-}" || -z "${APPLE_API_KEY_P8_BASE64:-}" ]]; then
+            echo "::notice::未配置签名/公证凭据，跳过公证（产物为 ad-hoc 签名）"
+            exit 0
+          fi
+          KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$KEY"
+          chmod 600 "$KEY"
+          APP="build/release-${{ matrix.arch }}/Slate.app"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$KEY" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+
+      # 签名闸门：坏签名的包用户根本打不开，所以先验再打包上传
+      - name: Verify signature
+        run: |
+          set -euo pipefail
+          APP="build/release-${{ matrix.arch }}/Slate.app"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+            spctl --assess --type execute --verbose=3 "$APP"
+          fi
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          APP="build/release-${{ matrix.arch }}/Slate.app"
+          ZIP="Slate-${VERSION}-${{ matrix.arch }}.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          shasum -a 256 "$ZIP" | tee "$ZIP.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: slate-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            Slate-*.zip
+            Slate-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      # Draft Release 已由 draft job 建好，这里只上传（--clobber 允许重跑覆盖）
+      - name: Upload to draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "$GITHUB_REF_NAME" \
+            "Slate-${VERSION}-${{ matrix.arch }}.zip" \
+            "Slate-${VERSION}-${{ matrix.arch }}.zip.sha256" \
+            --clobber
