@@ -183,8 +183,8 @@ git tag v1.0.25 && git push origin v1.0.25
 
 CI 会：构建 universal → Developer ID 签名（hardened runtime）→ notarytool 公证 →
 staple → `spctl` 校验 → 再做一个带 `/Applications` 快捷方式的 DMG（先签名、再公证、
-再 staple）→ 创建 Draft Release 并上传 `Slate-<version>.dmg`、`-universal.zip`
-及各自的 `.sha256`。arm64 单独构建保留为 Actions artifact，不进 Release（它是 ad-hoc 签名）。
+再 staple）→ 创建 Draft Release 并上传 `Slate-<version>.dmg` 和 `.sha256`。
+Release 只放 DMG；universal zip 与 arm64 单独构建都只保留为 Actions artifact。
 
 仓库 secrets（与 coeditor 同名）：
 

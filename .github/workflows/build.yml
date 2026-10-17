@@ -53,7 +53,7 @@ jobs:
           else
             gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
               --title "Slate $RELEASE_TAG (Apple Silicon)" \
-              --notes 'Slate 的 arm64 迁移构建。脚本引擎行为与原版 Intel 构建逐项对齐（见 BUILD-ARM64.md）。' \
+              --notes 'Universal version (Intel + Silicon), forked from original version 1.0(1.0.25)' \
               --draft
           fi
           gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
@@ -248,17 +248,18 @@ jobs:
           retention-days: 14
 
       # Draft Release 已由 draft job 建好，这里只上传（--clobber 允许重跑覆盖）
-      # 只把签名+公证的 universal 包传进 Release；arm64 单独构建是 ad-hoc，
-      # 直接给下载者会造成"无法验证开发者"，它保留为 Actions artifact。
+      # Release 只放已签名+公证的 DMG；zip 仅作为 Actions artifact 供内部使用。
       - name: Upload to draft release
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.arch == 'universal' 
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.arch == 'universal'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          files=("Slate-${VERSION}-${{ matrix.arch }}.zip" "Slate-${VERSION}-${{ matrix.arch }}.zip.sha256")
-          # DMG 只在签名+公证成功时才发布；否则宁可只给 zip
-          if [[ -f "Slate-${VERSION}.dmg" && "${NOTARIZED:-0}" == "1" ]]; then
-            files+=("Slate-${VERSION}.dmg" "Slate-${VERSION}.dmg.sha256")
+          if [[ "${NOTARIZED:-0}" != "1" ]]; then
+            echo "::error::Release 需要已公证的 DMG（缺少 Apple 凭据或公证失败）"
+            exit 1
           fi
-          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          gh release upload "$GITHUB_REF_NAME" \
+            "Slate-${VERSION}.dmg" \
+            "Slate-${VERSION}.dmg.sha256" \
+            --clobber
