@@ -208,9 +208,14 @@ Intel 机器也能装）：
 
 ```bash
 brew tap nuclearg/slate https://github.com/nuclearg/slate
+brew trust nuclearg/slate          # Homebrew 7+ 需要显式信任第三方 tap
 brew install --cask slate-amd64
 ```
 
 升级时改 `Casks/slate-amd64.rb` 里的 `version` 与 `sha256`（取自 Release 的
-`.sha256` 文件）即可。若以后单独建 `nuclearg/homebrew-slate` 仓库，就可以省掉
-显式 URL，直接 `brew tap nuclearg/slate`。
+`.sha256` 文件）即可。
+
+> 注意：tapping 的是整个应用仓库（约 70MB / 528 个文件），因为 cask 目前放在
+> `Casks/` 下。若在意首次 tap 的体积，可以另建一个只含 `Casks/slate-amd64.rb`
+> 的 `nuclearg/homebrew-slate` 仓库，之后 `brew tap nuclearg/slate` 即可（无需
+> 显式 URL）。
