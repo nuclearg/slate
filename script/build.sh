@@ -150,6 +150,9 @@ for f in initialize.js utils.js underscore.js default.slate \
   cp "$ROOT/Slate/$f" "$OUT/Contents/Resources/$f"
 done
 cp "$ROOT/Slate/en.lproj/InfoPlist.strings" "$OUT/Contents/Resources/en.lproj/InfoPlist.strings"
+# Credits.rtf carries the About panel links; it lives in the repo and must
+# override the copy that came from the original release bundle.
+cp "$ROOT/Slate/en.lproj/Credits.rtf" "$OUT/Contents/Resources/en.lproj/Credits.rtf"
 
 # Relaunch helper (see build-support/relaunch.m).
 "$CLANG" "${ARCH_FLAGS[@]}" -mmacosx-version-min="$MIN_OS" -isysroot "$SDK" \

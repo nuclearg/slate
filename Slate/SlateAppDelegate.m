@@ -161,7 +161,15 @@ static EventHandlerRef modifiersEvent;
 }
 
 - (IBAction)aboutWindow {
-  [NSApp orderFrontStandardAboutPanel:self];
+  // Show the fork lineage instead of the bare version number.  This is a
+  // statement about the upstream base (Slate 1.0, build 1.0.25), not about
+  // this fork's own release tag, so it stays fixed across fork releases.
+  // The standard About panel replaces its whole version line with
+  // NSAboutPanelOptionApplicationVersion, so no extra "Version" prefix is
+  // added by AppKit.
+  NSString *versionString = @"Forked from Version 1.0(1.0.25)";
+  [NSApp orderFrontStandardAboutPanelWithOptions:[NSDictionary dictionaryWithObject:versionString
+                                                                            forKey:NSAboutPanelOptionApplicationVersion]];
   NSArray *windows = [NSApp windows];
   for (NSWindow *window in windows) {
     [window setLevel:(NSScreenSaverWindowLevel - 1)];
