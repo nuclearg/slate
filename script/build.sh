@@ -137,7 +137,7 @@ done
 # JavaScriptCore directly), Carbon (hot keys) and Cocoa.  No Sparkle.
 "$CLANG" "${ARCH_FLAGS[@]}" -mmacosx-version-min="$MIN_OS" -isysroot "$SDK" \
   -o "$OUT/Contents/MacOS/Slate" "${OBJECTS[@]}" \
-  -framework Cocoa -framework Carbon -framework WebKit
+  -framework Cocoa -framework Carbon -framework WebKit -framework ApplicationServices
 
 # ---- Resources -----------------------------------------------------------
 # The nib is the one ibtool produced for the original release; MainMenu.xib has

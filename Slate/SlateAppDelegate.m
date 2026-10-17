@@ -20,6 +20,7 @@
 
 #import "Constants.h"
 #import "SlateAppDelegate.h"
+#import <ApplicationServices/ApplicationServices.h>
 #import "SlateConfig.h"
 #import "JSController.h"
 #import "Binding.h"
@@ -516,23 +517,18 @@ OSStatus OnModifiersChangedEvent(EventHandlerCallRef nextHandler, EventRef theEv
     keyUpLock = [[NSObject alloc] init];
   }
 
-  // Check if Accessibility API is enabled
-  if (!AXAPIEnabled()) {
-    NSAlert *alert = [SlateConfig warningAlertWithKeyEquivalents: [NSArray arrayWithObjects:@"Enable", @"Quit", nil]];
-    [alert setMessageText:[NSString stringWithFormat:@"Slate cannot run without \"Access for assistive devices\". Would you like to enable it?"]];
-    [alert setInformativeText:[NSString stringWithFormat:@"You may be prompted for your administrator password."]];
-    [alert setAlertStyle:NSCriticalAlertStyle];
-    NSInteger alertIndex = [alert runModal];
-    if (alertIndex == NSAlertFirstButtonReturn) {
-      SlateLogger(@"User wants to enable Access for assistive devices");
-      NSDictionary* errorDictionary;
-      NSAppleScript* applescript = [[NSAppleScript alloc] initWithSource:@"tell application \"System Events\" to set UI elements enabled to true"];
-      [applescript executeAndReturnError:&errorDictionary];
-    }
-    else if (alertIndex == NSAlertSecondButtonReturn) {
-      SlateLogger(@"User selected quit");
-      [NSApp terminate:nil];
-    }
+  // Ask macOS for Accessibility permission the modern way.  The old
+  // AXAPIEnabled() + "set UI elements enabled" AppleScript pair predates
+  // per-app TCC: on current macOS AXAPIEnabled() does not reflect this app's
+  // grant, so the system prompt never appeared and AX calls failed silently
+  // (bound window callbacks then received an undefined window).  Passing
+  // kAXTrustedCheckOptionPrompt makes macOS show its own dialog and add Slate
+  // to the Accessibility list; no blocking alert of our own is needed.
+  if (!AXIsProcessTrusted()) {
+    NSDictionary *trustOptions = [NSDictionary dictionaryWithObject:(id)kCFBooleanTrue
+                                                             forKey:(__bridge NSString *)kAXTrustedCheckOptionPrompt];
+    AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)trustOptions);
+    SlateLogger(@"Requested Accessibility permission via system prompt");
   }
 
   // Read Config
