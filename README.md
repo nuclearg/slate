@@ -46,6 +46,10 @@ Big thanks to [philc](https://github.com/philc) for the Window Hints idea (and i
 
 # Using Slate #
 
+> **Note:** The original installation instructions below are kept for reference only; they are superseded by [Install (macOS 11+, universal binary)](#install-macos-11-universal-binary) above.
+
+<del>
+
 ## Installing Slate ##
 
 **NEW Installation Instructions**
@@ -62,6 +66,8 @@ Big thanks to [philc](https://github.com/philc) for the Window Hints idea (and i
 Just run this in your terminal:
 
     cd /Applications && curl http://www.ninjamonkeysoftware.com/slate/versions/slate-latest.tar.gz | tar -xz
+
+</del>
 
 ## Configuring Slate ##
 
