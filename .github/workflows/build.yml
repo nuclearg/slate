@@ -189,7 +189,7 @@ jobs:
           fi
 
       - name: Build DMG
-        if: matrix.arch == 'universal'
+        if: matrix.arch == 'universal' && startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
           APP="build/release-${{ matrix.arch }}/Slate.app"
@@ -203,7 +203,7 @@ jobs:
       # DMG 必须「先签名 → 再公证 → 再 staple」：只公证不签名时
       # spctl -t open 会报 no usable signature；签名后再改文件会让票据失效。
       - name: Sign, notarize and staple DMG
-        if: matrix.arch == 'universal'
+        if: matrix.arch == 'universal' && startsWith(github.ref, 'refs/tags/v')
         env:
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
