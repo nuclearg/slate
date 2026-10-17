@@ -112,6 +112,16 @@ static NSDictionary *jscJsMethods;
 - (void)initializeWebView {
   if (inited) { return; }
   [[webView mainFrame] loadHTMLString:@"" baseURL:NULL];
+  // The initial load is asynchronous.  WebKit swaps the JS window object when
+  // that load commits, which invalidates every WebScriptObject created before
+  // it - including the function callbacks bound by the config, which would then
+  // fail later with "window._slate_callback is not a function".  Wait for the
+  // load to finish so underscore/utils/initialize and the config all run in the
+  // final, stable JS context.
+  NSDate *loadDeadline = [NSDate dateWithTimeIntervalSinceNow:5.0];
+  while ([webView isLoading] && [loadDeadline timeIntervalSinceNow] > 0) {
+    [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+  }
   scriptObject = [webView windowScriptObject];
   [scriptObject setValue:self forKey:@"_controller"];
   [self setInfo];
