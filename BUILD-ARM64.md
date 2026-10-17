@@ -136,3 +136,34 @@ xcrun stapler staple build/release-universal/Slate.app
   修补）。Xcode 在这里只用于提供 SDK/clang 和 `notarytool`。
 - 上游的单元测试目标使用已被移除的 SenTestingKit，未纳入本次迁移；脚本引擎的回归
   由 `script/verify-parity.sh` 覆盖。
+
+## GitHub Actions
+
+`.github/workflows/build.yml`（参考 `nuclearg/coeditor` 的桌面流水线）：
+
+- **push `master` / PR / 手工触发**：在 `macos-latest`（arm64）上矩阵构建
+  `arm64` 与 `universal`，上传为 Actions artifact（保留 14 天）
+- **push tag `v*`**：先建（或复用）Draft Release，再由两个矩阵 job 上传
+  `Slate-<version>-<arch>.zip` 和 `.sha256`
+- **arm64 job**：安装 Rosetta 后，用原版 Intel 二进制做
+  `script/verify-parity.sh` 对比（66 项）；runner 无 GUI session 时以 SKIP
+  告警，不误报失败
+- **签名/公证**：配置了与 coeditor 同名的 secrets 时，对 universal 包做
+  Developer ID 签名 + 公证 + staple；未配置则自动降级为 ad-hoc
+
+```bash
+git tag v1.0.25 && git push origin v1.0.25   # 触发 Draft Release
+```
+
+需要的 secrets（与 `nuclearg/coeditor` 同名，可在那边 `gh secret list` 核对）：
+
+```
+APPLE_CERTIFICATE
+APPLE_CERTIFICATE_PASSWORD
+KEYCHAIN_PASSWORD
+APPLE_SIGNING_IDENTITY
+APPLE_API_KEY
+APPLE_API_KEY_P8_BASE64
+APPLE_API_ISSUER
+APPLE_TEAM_ID
+```
