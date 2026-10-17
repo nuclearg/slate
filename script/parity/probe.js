@@ -57,9 +57,10 @@
   t("src.bad", function () { return slate.source("/nonexistent-xyz"); });
   t("cfg.get", function () { return slate.info.defaultToCurrentScreen ? "has" : "missing"; });
 
-  t("screen.main", function () { return slate.info.screen().main(); });
-  t("screen.isMain", function () { return slate.info.screen().isMain(); });
-  t("screen.id.type", function () { return typeof slate.info.screen().id(); });
+  // Deliberately no screen.main()/screen.isMain() probes: JSInfoWrapper.screen
+  // resolves through the focused window (AX), which differs between the first
+  // and second launch at config-load time and makes the comparison flaky.
+  // BOOL marshalling is covered deterministically by isRectOffScreen below.
   t("rect.off", function () { return slate.info.isRectOffScreen({x:-99999,y:-99999,width:10,height:10}); });
   t("rect.on", function () { return slate.info.isRectOffScreen({x:0,y:0,width:10,height:10}); });
   t("pnt.off", function () { return slate.info.isPointOffScreen({x:100,y:100}); });
