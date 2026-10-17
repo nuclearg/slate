@@ -1,11 +1,11 @@
-cask "slate-amd64" do
+cask "slate" do
   version "1.0.25"
-  sha256 "8810aa515758783da4a6c95f97d85d41803304d89aad186a565cbc3fee7c2a9f"
+  sha256 "a42ad4765eb5c0760d3bf75e7886db670779e0508e8400429c5186e01ebb3637"
 
   # Universal build: runs natively on Apple Silicon and Intel.
-  url "https://github.com/nuclearg/slate/releases/download/v#{version}/Slate-#{version}-universal.zip"
+  url "https://github.com/nuclearg/slate/releases/download/v#{version}/Slate-#{version}.dmg"
   name "Slate"
-  desc "Keyboard-driven window manager (arm64 fork of Slate)"
+  desc "Keyboard-driven window manager (maintained arm64 fork)"
   homepage "https://github.com/nuclearg/slate"
 
   # The app is built for macOS 11.0+ (arm64 minimum).

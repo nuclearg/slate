@@ -182,8 +182,9 @@ git tag v1.0.25 && git push origin v1.0.25
 ```
 
 CI 会：构建 universal → Developer ID 签名（hardened runtime）→ notarytool 公证 →
-staple → `spctl` 校验 → 创建 Draft Release 并上传 `Slate-<version>-universal.zip`
-和 `.sha256`。arm64 单独构建保留为 Actions artifact，不进 Release（它是 ad-hoc 签名）。
+staple → `spctl` 校验 → 再做一个带 `/Applications` 快捷方式的 DMG（先签名、再公证、
+再 staple）→ 创建 Draft Release 并上传 `Slate-<version>.dmg`、`-universal.zip`
+及各自的 `.sha256`。arm64 单独构建保留为 Actions artifact，不进 Release（它是 ad-hoc 签名）。
 
 仓库 secrets（与 coeditor 同名）：
 
@@ -203,19 +204,18 @@ APPLE_TEAM_ID
 
 ## Homebrew Cask
 
-仓库里带了 `Casks/slate-amd64.rb`（token 按 arm64 迁移命名；包本身是 universal，
+仓库里带了 `Casks/slate.rb`（token 就是 `slate`；包本身是 universal，
 Intel 机器也能装）：
 
 ```bash
 brew tap nuclearg/slate https://github.com/nuclearg/slate
 brew trust nuclearg/slate          # Homebrew 7+ 需要显式信任第三方 tap
-brew install --cask slate-amd64
+brew install --cask slate
 ```
 
-升级时改 `Casks/slate-amd64.rb` 里的 `version` 与 `sha256`（取自 Release 的
-`.sha256` 文件）即可。
+升级时改 `Casks/slate.rb` 里的 `version` 与 `sha256`（取自 Release 的
+`Slate-<version>.dmg.sha256`）即可。
 
 > 注意：tapping 的是整个应用仓库（约 70MB / 528 个文件），因为 cask 目前放在
-> `Casks/` 下。若在意首次 tap 的体积，可以另建一个只含 `Casks/slate-amd64.rb`
-> 的 `nuclearg/homebrew-slate` 仓库，之后 `brew tap nuclearg/slate` 即可（无需
-> 显式 URL）。
+> `Casks/` 下。若在意首次 tap 的体积，可以另建一个只含 `Casks/slate.rb` 的
+> `nuclearg/homebrew-slate` 仓库，之后 `brew tap nuclearg/slate` 即可（无需显式 URL）。

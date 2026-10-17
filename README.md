@@ -1,5 +1,29 @@
 # About Slate #
 
+> **Apple Silicon fork.** This is a maintained arm64 rebuild of
+> [jigish/slate](https://github.com/jigish/slate); the upstream project is no
+> longer maintained. Script-engine behaviour is kept identical to the original
+> Intel release — see [BUILD-ARM64.md](BUILD-ARM64.md).
+
+## Install (macOS 11+, universal binary) ##
+
+Homebrew:
+
+```bash
+brew tap nuclearg/slate https://github.com/nuclearg/slate
+brew trust nuclearg/slate          # Homebrew 7+ requires trusting third-party taps
+brew install --cask slate
+```
+
+Or download `Slate-<version>.dmg` from
+[Releases](https://github.com/nuclearg/slate/releases/latest), open it and drag
+Slate into Applications.
+
+After the first launch, enable Slate in **System Settings → Privacy & Security →
+Accessibility**, otherwise it cannot move windows. Auto-update is disabled in
+this fork ("Check for Updates" is a no-op).
+
+
 Slate is a window management application similar to Divvy and SizeUp (except better and free!). Originally written to replace them due to some limitations in how each work, it attempts to overcome them by simply being extremely configurable. As a result, it may be a bit daunting to get configured, but once it is done, the benefit is huge.
 
 Slate currently works on Mac OS X 10.6 and above

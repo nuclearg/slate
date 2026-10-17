@@ -188,6 +188,42 @@ jobs:
             spctl --assess --type execute --verbose=3 "$APP"
           fi
 
+      - name: Build DMG
+        if: matrix.arch == 'universal'
+        run: |
+          set -euo pipefail
+          APP="build/release-${{ matrix.arch }}/Slate.app"
+          STAGE="$RUNNER_TEMP/dmg-stage"
+          rm -rf "$STAGE"; mkdir -p "$STAGE"
+          ditto "$APP" "$STAGE/Slate.app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "Slate" -srcfolder "$STAGE" -ov -format UDZO "Slate-${VERSION}.dmg"
+          hdiutil verify "Slate-${VERSION}.dmg"
+
+      # DMG 必须「先签名 → 再公证 → 再 staple」：只公证不签名时
+      # spctl -t open 会报 no usable signature；签名后再改文件会让票据失效。
+      - name: Sign, notarize and staple DMG
+        if: matrix.arch == 'universal'
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          DMG="Slate-${VERSION}.dmg"
+          if [[ "${NOTARIZED:-0}" != "1" ]]; then
+            echo "::notice::应用未公证，跳过 DMG 签名/公证"
+            exit 0
+          fi
+          codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
+          KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$KEY"
+          chmod 600 "$KEY"
+          xcrun notarytool submit "$DMG" --key "$KEY" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=3 "$DMG"
+
       - name: Package
         run: |
           set -euo pipefail
@@ -195,6 +231,9 @@ jobs:
           ZIP="Slate-${VERSION}-${{ matrix.arch }}.zip"
           ditto -c -k --keepParent "$APP" "$ZIP"
           shasum -a 256 "$ZIP" | tee "$ZIP.sha256"
+          if [[ -f "Slate-${VERSION}.dmg" ]]; then
+            shasum -a 256 "Slate-${VERSION}.dmg" | tee "Slate-${VERSION}.dmg.sha256"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
@@ -203,6 +242,8 @@ jobs:
           path: |
             Slate-*.zip
             Slate-*.zip.sha256
+            Slate-*.dmg
+            Slate-*.dmg.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -215,7 +256,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "$GITHUB_REF_NAME" \
-            "Slate-${VERSION}-${{ matrix.arch }}.zip" \
-            "Slate-${VERSION}-${{ matrix.arch }}.zip.sha256" \
-            --clobber
+          files=("Slate-${VERSION}-${{ matrix.arch }}.zip" "Slate-${VERSION}-${{ matrix.arch }}.zip.sha256")
+          # DMG 只在签名+公证成功时才发布；否则宁可只给 zip
+          if [[ -f "Slate-${VERSION}.dmg" && "${NOTARIZED:-0}" == "1" ]]; then
+            files+=("Slate-${VERSION}.dmg" "Slate-${VERSION}.dmg.sha256")
+          fi
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
