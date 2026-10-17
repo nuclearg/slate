@@ -13,3 +13,11 @@ Slate.xcodeproj/xcuserdata/jigish.xcuserdatad/
 # don't version xcode artifacts
 *.xcuserdatad
 tmp
+# arm64 / universal migration build outputs
+build/release-arm64/
+build/release-universal/
+build/release-x86_64/
+build/debug-arm64/
+build/debug-universal/
+build/debug-x86_64/
+build/obj-*/

@@ -78,7 +78,14 @@
 
   [task launch];
   if (wait){
-    [task waitUntilExit];
+    // Compatibility fix, arm64 migration: -waitUntilExit spins the main run
+    // loop.  ShellUtils can be reached from inside a WebScriptObject
+    // evaluation (slate.sh / a "shell" operation), and on arm64 that nested
+    // run loop lets WebKit tear down the very JS context we are executing in,
+    // so the call fails with "Trying to access object from destroyed plug-in".
+    // Polling isRunning blocks the thread without servicing the run loop and
+    // keeps the original observable behaviour (wait for exit, then read).
+    while ([task isRunning]) { usleep(5000); }
     SlateLogger(@"SHELL RESULT:");
     SlateLogger([[NSString alloc] initWithData:[file readDataToEndOfFile] encoding:NSUTF8StringEncoding]);
   }
@@ -114,7 +121,8 @@
 
   [task launch];
   if (!wait) return nil;
-  [task waitUntilExit];
+  // See the note in run:args:wait:path: above; same arm64 run-loop hazard.
+  while ([task isRunning]) { usleep(5000); }
   NSData *data = [file readDataToEndOfFile];
   NSString *res = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
   SlateLogger(@"SHELL RESULT:");
