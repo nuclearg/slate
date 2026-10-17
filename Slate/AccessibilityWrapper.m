@@ -37,12 +37,12 @@ static NSDictionary *unselectableApps = nil;
     [AccessibilityWrapper createSystemWideElement];
 
     // Get App that has focus
-    CFTypeRef _app;
+    CFTypeRef _app = NULL;
     AXUIElementCopyAttributeValue(systemWideElement, (CFStringRef)kAXFocusedApplicationAttribute, (CFTypeRef *)&_app);
     [self setApp:(AXUIElementRef)_app];
 
     // Get Window that has focus
-    CFTypeRef _window;
+    CFTypeRef _window = NULL;
     if (AXUIElementCopyAttributeValue(app, (CFStringRef)NSAccessibilityFocusedWindowAttribute, (CFTypeRef *)&_window) == kAXErrorSuccess) {
       [self setWindow:(AXUIElementRef)_window];
       [self setInited:YES];
@@ -68,7 +68,7 @@ static NSDictionary *unselectableApps = nil;
 }
 
 + (NSPoint)getTopLeftForWindow:(AXUIElementRef)window {
-  CFTypeRef _cPosition;
+  CFTypeRef _cPosition = NULL;
   NSPoint cTopLeft;
 
   if (AXUIElementCopyAttributeValue(window, (CFStringRef)NSAccessibilityPositionAttribute, (CFTypeRef *)&_cPosition) == kAXErrorSuccess) {
@@ -90,7 +90,7 @@ static NSDictionary *unselectableApps = nil;
 }
 
 + (NSSize)getSizeForWindow:(AXUIElementRef)window {
-  CFTypeRef _cSize;
+  CFTypeRef _cSize = NULL;
   NSSize cSize;
 
   if (AXUIElementCopyAttributeValue(window, (CFStringRef)NSAccessibilitySizeAttribute, (CFTypeRef *)&_cSize) == kAXErrorSuccess) {
@@ -173,7 +173,7 @@ static NSDictionary *unselectableApps = nil;
 
 + (BOOL)focusMainWindow:(NSRunningApplication *)app {
   BOOL couldFocus = YES;
-  CFTypeRef _window;
+  CFTypeRef _window = NULL;
   pid_t focusPID = [app processIdentifier];
   AXUIElementCopyAttributeValue(AXUIElementCreateApplication(focusPID), (CFStringRef)NSAccessibilityFocusedWindowAttribute, (CFTypeRef *)&_window);
   if (_window == NULL) return [AccessibilityWrapper focusApp:app];
@@ -225,14 +225,14 @@ static NSDictionary *unselectableApps = nil;
 }
 
 + (AXUIElementRef)focusedWindowInRunningApp:(NSRunningApplication *)app {
-  CFTypeRef _window;
+  CFTypeRef _window = NULL;
   AXUIElementCopyAttributeValue(AXUIElementCreateApplication([app processIdentifier]), (CFStringRef)NSAccessibilityFocusedWindowAttribute, (CFTypeRef *)&_window);
   return _window;
 }
 
 + (BOOL)isMainWindow:(AXUIElementRef)window {
   [AccessibilityWrapper createSystemWideElement];
-  CFTypeRef _isMain;
+  CFTypeRef _isMain = NULL;
   if (AXUIElementCopyAttributeValue(window, (CFStringRef)NSAccessibilityMainAttribute, (CFTypeRef *)&_isMain) == kAXErrorSuccess) {
     NSNumber *isMain = (__bridge NSNumber *) _isMain;
     return [isMain boolValue];
@@ -242,7 +242,7 @@ static NSDictionary *unselectableApps = nil;
 
 + (NSString *)getTitle:(AXUIElementRef)window {
   [AccessibilityWrapper createSystemWideElement];
-  CFTypeRef _title;
+  CFTypeRef _title = NULL;
   if (AXUIElementCopyAttributeValue(window, (CFStringRef)NSAccessibilityTitleAttribute, (CFTypeRef *)&_title) == kAXErrorSuccess) {
     NSString *title = (__bridge NSString *) _title;
     if (_title != NULL) CFRelease(_title);
@@ -254,8 +254,8 @@ static NSDictionary *unselectableApps = nil;
 
 + (BOOL)isWindowMinimizedOrHidden:(AXUIElementRef)window inApp:(AXUIElementRef)app {
   [AccessibilityWrapper createSystemWideElement];
-  CFTypeRef _isMinimized;
-  CFTypeRef _isHidden;
+  CFTypeRef _isMinimized = NULL;
+  CFTypeRef _isHidden = NULL;
   BOOL isMinimized = NO;
   BOOL isHidden = NO;
   if (AXUIElementCopyAttributeValue(app, (CFStringRef)NSAccessibilityHiddenAttribute, (CFTypeRef *)&_isHidden) == kAXErrorSuccess) {
@@ -271,9 +271,9 @@ static NSDictionary *unselectableApps = nil;
 
 + (AXUIElementRef)windowUnderPoint:(NSPoint)point {
   [AccessibilityWrapper createSystemWideElement];
-  AXUIElementRef _element;
+  AXUIElementRef _element = NULL;
   if ((AXUIElementCopyElementAtPosition(systemWideElement, point.x, point.y, &_element) == kAXErrorSuccess) && _element) {
-    CFTypeRef _role;
+    CFTypeRef _role = NULL;
     if (AXUIElementCopyAttributeValue(_element, (CFStringRef)NSAccessibilityRoleAttribute, (CFTypeRef *)&_role) == kAXErrorSuccess) {
       if ([(__bridge NSString *)_role isEqualToString:NSAccessibilityWindowRole]) {
         if (_role != NULL) CFRelease(_role);
@@ -281,7 +281,7 @@ static NSDictionary *unselectableApps = nil;
       }
       if (_role != NULL) CFRelease(_role);
     }
-    CFTypeRef _window;
+    CFTypeRef _window = NULL;
     if (AXUIElementCopyAttributeValue(_element, (CFStringRef)NSAccessibilityWindowAttribute, (CFTypeRef *)&_window) == kAXErrorSuccess) {
       if (_element != NULL) CFRelease(_element);
       return (AXUIElementRef)_window;
@@ -306,7 +306,7 @@ static NSDictionary *unselectableApps = nil;
 }
 
 + (BOOL)isWindow:(AXUIElementRef)element {
-  CFTypeRef _role;
+  CFTypeRef _role = NULL;
   AXUIElementCopyAttributeValue(element, (CFStringRef)NSAccessibilityRoleAttribute, &_role);
   BOOL isWindow = [NSAccessibilityWindowRole isEqualToString:(__bridge NSString *)_role];
   if (_role != NULL) CFRelease(_role);
@@ -315,7 +315,7 @@ static NSDictionary *unselectableApps = nil;
 
 + (NSString *)getRole:(AXUIElementRef)element {
   if (element == NULL || element == nil) return nil;
-  CFTypeRef _role;
+  CFTypeRef _role = NULL;
   if (AXUIElementCopyAttributeValue(element, (CFStringRef)NSAccessibilityRoleAttribute, &_role) == kAXErrorSuccess) {
     NSString *role =  (__bridge NSString *)_role;
     if (_role != NULL) CFRelease(_role);
