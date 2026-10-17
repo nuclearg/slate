@@ -160,8 +160,9 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
           set -euo pipefail
-          if [[ -z "${SIGN_IDENTITY:-}" || -z "${APPLE_API_KEY_P8_BASE64:-}" ]]; then
-            echo "::notice::未配置签名/公证凭据，跳过公证（产物为 ad-hoc 签名）"
+          if [[ -z "${SIGN_IDENTITY:-}" || -z "${APPLE_API_KEY_P8_BASE64:-}" || -z "${APPLE_API_KEY:-}" || -z "${APPLE_API_ISSUER:-}" ]]; then
+            echo "::notice::签名/公证凭据不完整，跳过公证（产物已签名但未公证，用户首次打开需手动放行）"
+            echo "NOTARIZED=0" >> "$GITHUB_ENV"
             exit 0
           fi
           KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
@@ -173,6 +174,7 @@ jobs:
             --key "$KEY" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
           xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
+          echo "NOTARIZED=1" >> "$GITHUB_ENV"
 
       # 签名闸门：坏签名的包用户根本打不开，所以先验再打包上传
       - name: Verify signature
@@ -180,7 +182,9 @@ jobs:
           set -euo pipefail
           APP="build/release-${{ matrix.arch }}/Slate.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
-          if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+          # spctl only makes sense for a stapled, notarized bundle; a Developer ID
+          # signature without a ticket is expected to be rejected.
+          if [[ "${NOTARIZED:-0}" == "1" ]]; then
             spctl --assess --type execute --verbose=3 "$APP"
           fi
 
