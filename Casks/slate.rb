@@ -1,6 +1,6 @@
 cask "slate" do
   version "1.0.25"
-  sha256 "dc5064f8f65f7f71c45c00ef66b5c11d48b8aa889ae1a6038a330b1b2ac48d0c"
+  sha256 "58265dea0ed44cccb320b5e3c693c922b489fba4e3cd2e35ea4ded61fe8a9f8e"
 
   # Universal build: runs natively on Apple Silicon and Intel.
   url "https://github.com/nuclearg/slate/releases/download/v#{version}/Slate-#{version}.dmg"
